@@ -92,7 +92,7 @@ if err != nil {
 	panic(err)
 }
 fmt.Printf("uid: %v\n", uid)
-db.Table("user").FlushCache() // Customization requires manual refresh of the cache
+db.Table("user").LoadCache() // Customization requires manual refresh of the cache
 ```
 
 # Use cases

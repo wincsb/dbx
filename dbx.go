@@ -53,10 +53,11 @@ func dbxErrorType(err interface{}) bool {
 	_, ok := err.(*dbxError)
 	return ok
 }
-func dbxErrorDefer(err *error) {
+func dbxErrorDefer(err *error, db *Query) {
 	if err1 := recover(); err1 != nil {
 		*err = fmt.Errorf("dbx panic(): %v", err1)
 		if !dbxErrorType(err1) {
+			db.ErrorLog((*err).Error())
 			debug.PrintStack()
 			os.Exit(0)
 		}
@@ -612,7 +613,7 @@ func (q *Query) toSQL(tableStruct *TableStruct, action int, rvalues ...reflect.V
 }
 
 func (q *Query) One(arrIfc interface{}) (err error) {
-	defer dbxErrorDefer(&err)
+	defer dbxErrorDefer(&err, q)
 	arrType := reflect.TypeOf(arrIfc)
 	arrValue := reflect.ValueOf(arrIfc)
 	if arrType.Kind() != reflect.Ptr {
@@ -713,7 +714,7 @@ func (q *Query) One(arrIfc interface{}) (err error) {
 }
 
 func (q *Query) All(arrListIfc interface{}) (err error) {
-	defer dbxErrorDefer(&err)
+	defer dbxErrorDefer(&err, q)
 	arrListType := reflect.TypeOf(arrListIfc)
 	if arrListType.Kind() != reflect.Ptr {
 		q.Panic("must pass a slice pointer: %v", arrListType.Kind())
@@ -752,7 +753,7 @@ func (q *Query) All(arrListIfc interface{}) (err error) {
 }
 
 func (q *Query) Count() (n int64, err error) {
-	defer dbxErrorDefer(&err)
+	defer dbxErrorDefer(&err, q)
 	q.Fields("COUNT(*)")
 	sql1, args := q.toSQL(nil, ACTION_SELECT_ONE)
 	err = q.QueryRow(sql1, args...).Scan(&n)
@@ -766,7 +767,7 @@ func (q *Query) Count() (n int64, err error) {
 
 // 针对某一列
 func (q *Query) Sum(colName string) (n int64, err error) {
-	defer dbxErrorDefer(&err)
+	defer dbxErrorDefer(&err, q)
 	q.Fields("SUM(" + colName + ")")
 	sql1, args := q.toSQL(nil, ACTION_SELECT_ONE)
 	err = q.QueryRow(sql1, args...).Scan(&n)
@@ -780,7 +781,7 @@ func (q *Query) Sum(colName string) (n int64, err error) {
 
 // 针对某一列
 func (q *Query) Max(colName string) (n int64, err error) {
-	defer dbxErrorDefer(&err)
+	defer dbxErrorDefer(&err, q)
 	q.Fields("MAX(" + colName + ")")
 	sql1, args := q.toSQL(nil, ACTION_SELECT_ONE)
 	err = q.QueryRow(sql1, args...).Scan(&n)
@@ -794,7 +795,7 @@ func (q *Query) Max(colName string) (n int64, err error) {
 
 // 针对某一列
 func (q *Query) Min(colName string) (n int64, err error) {
-	defer dbxErrorDefer(&err)
+	defer dbxErrorDefer(&err, q)
 	q.Fields("MIN(" + colName + ")")
 	sql1, args := q.toSQL(nil, ACTION_SELECT_ONE)
 	err = q.QueryRow(sql1, args...).Scan(&n)
@@ -845,7 +846,7 @@ func (q *Query) insert_replace(ifc interface{}, isReplace bool) (insertId int64,
 		return
 	}
 
-	defer dbxErrorDefer(&err)
+	defer dbxErrorDefer(&err, q)
 
 	ifc2 := ifc
 	arrType := reflect.TypeOf(ifc)
@@ -914,7 +915,7 @@ func (q *Query) Update(ifc interface{}) (affectedRows int64, err error) {
 		return
 	}
 
-	defer dbxErrorDefer(&err)
+	defer dbxErrorDefer(&err, q)
 
 	ifc2 := ifc
 	arrType := reflect.TypeOf(ifc)
@@ -981,7 +982,7 @@ func (q *Query) UpdateM(m M) (affectedRows int64, err error) {
 		return
 	}
 
-	defer dbxErrorDefer(&err)
+	defer dbxErrorDefer(&err, q)
 
 	// 如果开启了缓存，则先查询，再更新
 	tableStruct := q.getTableStruct()
@@ -1095,7 +1096,7 @@ func (q *Query) Delete() (n int64, err error) {
 		return
 	}
 
-	defer dbxErrorDefer(&err)
+	defer dbxErrorDefer(&err, q)
 
 	// 更新缓存
 	tableStruct := q.getTableStruct()

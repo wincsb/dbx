@@ -88,7 +88,7 @@ if err != nil {
 	panic(err)
 }
 fmt.Printf("uid: %v\n", uid)
-db.Table("user").FlushCache() // 自定义需要手动刷新缓存
+db.Table("user").LoadCache() // 自定义需要手动刷新缓存
 ```
 
 # 用例
