@@ -819,7 +819,8 @@ func (q *Query) getTableStruct(arrTypes ...reflect.Type) (tableStruct *TableStru
 	}
 	arrType := arrTypes[0]
 	if arrType.Kind() != reflect.Ptr {
-		panic(dbxErrorNew("getTableStruct(arrType) expect type of &struct."))
+		arrType = reflect.New(arrType).Type()
+		//panic(dbxErrorNew("getTableStruct(arrType) expect type of &struct."))
 	}
 
 	var ok bool

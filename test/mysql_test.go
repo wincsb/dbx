@@ -143,8 +143,21 @@ func TestMulti(t *testing.T) {
 
 	// 复杂条件查询
 	u3 := &User{}
-	err = db.Table("user").Where("uid=?", 1).One(u3)
+	err = db.Table("user").Where("uid=? AND gid=?", 1, 1).Sort("uid", 1).One(u3)
 	assert.Equal(t, err, nil)
 	assert.Equal(t, u3.Uid, int64(1))
+
+	// 查询多条
+	userList := []*User{}
+	err = db.Table("user").Where("uid>? AND gid>?", 0, 0).Sort("uid", 1).Limit(0, 2).All(&userList)
+	assert.Equal(t, userList[0].Uid, int64(1))
+	assert.Equal(t, userList[1].Uid, int64(2))
+
+
+	// 查询多条
+	userList2 := []User{}
+	err = db.Table("user").Where("uid>? AND gid>?", 0, 0).Sort("uid", 1).Limit(0, 2).All(&userList2)
+	assert.Equal(t, userList2[0].Uid, int64(1))
+	assert.Equal(t, userList2[1].Uid, int64(2))
 
 }
