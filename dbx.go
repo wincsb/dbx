@@ -321,7 +321,7 @@ func (db *DB) SetReadOnly(b bool) {
 
 func (db *DB) EnableCache(b bool) {
 	db.tableEnableCache = b
-	if b == true {
+	if b == true && len(db.tableData) == 0{
 		db.LoadCache()
 	}
 }

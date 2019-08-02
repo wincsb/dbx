@@ -173,12 +173,12 @@ func TestMulti(t *testing.T) {
 	assert.Equal(t, err, nil)
 	assert.Equal(t, n, int64(4))
 
-	// 校验
+	// 校验 DB
 	err = db.Table("user").Where("uid=?", 1).One(u3)
 	assert.Equal(t, err, nil)
 	assert.Equal(t, u3.Name, "jet3")
 
-	// 校验
+	// 校验 Cache
 	err = db.Table("user").WherePK(1).One(u3)
 	assert.Equal(t, err, nil)
 	assert.Equal(t, u3.Name, "jet3")
@@ -187,4 +187,7 @@ func TestMulti(t *testing.T) {
 	n, err = db.Table("user").Where("uid>? AND gid>?", 0, 0).Sort("uid", 1).Limit(2).Delete()
 	assert.Equal(t, err, nil)
 	assert.Equal(t, n, int64(4))
+
+
+
 }
