@@ -566,8 +566,10 @@ func (q *Query) toSQL(tableStruct *TableStruct, action int, rvalues ...reflect.V
 	if len(q.orderBy) > 0 {
 		orderBy = " ORDER BY " + q.orderByToSQL()
 	}
-	if q.limitStart != 0 || q.limitEnd != 0 {
+	if q.limitStart != 0 && q.limitEnd != 0 {
 		limit = fmt.Sprintf(" LIMIT %v,%v", q.limitStart, q.limitEnd)
+	} else if q.limitStart != 0 && q.limitEnd == 0 {
+		limit = fmt.Sprintf(" LIMIT %v", q.limitStart)
 	}
 	switch action {
 	case ACTION_SELECT_ONE:
@@ -587,6 +589,9 @@ func (q *Query) toSQL(tableStruct *TableStruct, action int, rvalues ...reflect.V
 		updateArgs = struct_value_to_args(tableStruct, rvalues[0], true)
 		args = append(updateArgs, args...)
 	case ACTION_UPDATE_M:
+		if q.DriverType == DRIVER_SQLITE {
+			limit = ""
+		}
 		colNames := arr_to_sql_add(q.updateFields, "=?", ",")
 		sql1 = fmt.Sprintf("UPDATE %v SET %v%v%v", q.table, colNames, where, limit)
 		args = append(q.updateArgs, args...)
@@ -985,7 +990,7 @@ func (q *Query) UpdateM(m M) (affectedRows int64, err error) {
 
 	defer dbxErrorDefer(&err, q)
 
-	// 如果开启了缓存，则先查询，再更新
+	// 如果开启了缓存，则先查询，再更新，否则，更新完以后，就查询不到了！
 	tableStruct := q.getTableStruct()
 
 	updateFields := make([]string, len(m))
@@ -1003,10 +1008,11 @@ func (q *Query) UpdateM(m M) (affectedRows int64, err error) {
 
 	pkColNames := tableStruct.PrimaryKey
 
-	// 更新缓存
+	// 更新缓存，不用判断条数，反正都是针对小表缓存
 	if q.tableEnableCache && tableStruct.EnableCache {
 		var rows *sql.Rows
 		var stmt *sql.Stmt
+		// 只是选择主键
 		fields2 := arr_to_sql_add(append(pkColNames), "", ",")
 		where2, args2 := q.whereToSQL(tableStruct)
 		sql2 := fmt.Sprintf("SELECT %v FROM %v%v", fields2, q.table, where2)
@@ -1049,7 +1055,7 @@ func (q *Query) UpdateM(m M) (affectedRows int64, err error) {
 
 		listValue = listValue.Elem()
 		for i := 0; i < listValue.Len(); i++ {
-			row := listValue.Index(i)
+			row := listValue.Index(i) // 只有主键的数据
 			pkKey := get_pk_key(tableStruct, row.Elem())
 
 			// 遍历 M，挨个更新字段
@@ -1062,14 +1068,12 @@ func (q *Query) UpdateM(m M) (affectedRows int64, err error) {
 				// 更新有限的字段
 				for j, _ := range updateFields {
 					pos := poses[j]
-					var oldV, newV reflect.Value
+					var oldV reflect.Value
 					oldV = get_reflect_value_from_pos(reflect.ValueOf(old).Elem(), pos)
-					newV = get_reflect_value_from_pos(row.Elem(), pos)
-					oldV.Set(newV)
+					oldV.Set(reflect.ValueOf(updateArgs[j]))
 				}
 			}
 		}
-		//q.tableData[q.table] = mp
 	}
 
 	// 更新

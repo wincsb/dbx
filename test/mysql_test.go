@@ -73,14 +73,23 @@ func TestOne(t *testing.T) {
 	u2.Gid = 2
 	u2.Name = "jet2"
 	u2.CreateDate = now.Add(1 * time.Second)
-	n, err := db.Table("user").WherePK(1).Update(u2)
+	n, err = db.Table("user").WherePK(1).Update(u2)
 	assert.Equal(t, n, int64(1))
 	assert.Equal(t, err, nil)
 
 	// 取出来，进行比较
 	u3 := &User{}
 	db.Table("user").WherePK(1).One(u3)
-	assert.Equal(t, *u3, *u2)
+	assert.Equal(t, u2.Name, "jet2")
+
+
+	n, err = db.Table("user").WherePK(1).UpdateM(dbx.M{{"name", "jet3"}})
+	assert.Equal(t, n, int64(1))
+	assert.Equal(t, err, nil)
+
+	// 取出来，进行比较
+	db.Table("user").WherePK(1).One(u3)
+	assert.Equal(t, u3.Name, "jet3")
 
 	// 其他条件的查询测试
 	err = db.Table("user").Where("uid=?", 1).One(u2)
@@ -90,10 +99,10 @@ func TestOne(t *testing.T) {
 	db.Table("user").WhereM(dbx.M{{"uid", 1}}).One(u3)
 	assert.Equal(t, *u3, *u2)
 
-	db.Table("user").WhereM(dbx.M{{"uid>", 0}}).One(u3)
+	db.Table("user").WhereM(dbx.M{{"uid", 0}}).One(u3)
 	assert.Equal(t, *u3, *u2)
 
-	db.Table("user").WhereM(dbx.M{{"gid>", 0}}).One(u3)
+	db.Table("user").WhereM(dbx.M{{"gid", 0}}).One(u3)
 	assert.Equal(t, *u3, *u2)
 
 	db.Table("user").WhereM(dbx.M{{"uid", 1}, {"gid", 1}}).One(u3)
@@ -141,23 +150,41 @@ func TestMulti(t *testing.T) {
 		assert.Equal(t, u2.CreateDate, now)
 	}
 
-	// 复杂条件查询
+	// 复杂条件查询一条
 	u3 := &User{}
 	err = db.Table("user").Where("uid=? AND gid=?", 1, 1).Sort("uid", 1).One(u3)
 	assert.Equal(t, err, nil)
 	assert.Equal(t, u3.Uid, int64(1))
 
-	// 查询多条
+	// 复杂条件查询多条
 	userList := []*User{}
 	err = db.Table("user").Where("uid>? AND gid>?", 0, 0).Sort("uid", 1).Limit(0, 2).All(&userList)
 	assert.Equal(t, userList[0].Uid, int64(1))
 	assert.Equal(t, userList[1].Uid, int64(2))
 
-
-	// 查询多条
+	// 复杂条件查询多条
 	userList2 := []User{}
 	err = db.Table("user").Where("uid>? AND gid>?", 0, 0).Sort("uid", 1).Limit(0, 2).All(&userList2)
 	assert.Equal(t, userList2[0].Uid, int64(1))
 	assert.Equal(t, userList2[1].Uid, int64(2))
 
+	// 复杂条件更新多条
+	n, err = db.Table("user").Where("uid>? AND gid>?", 0, 0).Sort("uid", 1).Limit(2).UpdateM(dbx.M{{"name", "jet3"}})
+	assert.Equal(t, err, nil)
+	assert.Equal(t, n, int64(4))
+
+	// 校验
+	err = db.Table("user").Where("uid=?", 1).One(u3)
+	assert.Equal(t, err, nil)
+	assert.Equal(t, u3.Name, "jet3")
+
+	// 校验
+	err = db.Table("user").WherePK(1).One(u3)
+	assert.Equal(t, err, nil)
+	assert.Equal(t, u3.Name, "jet3")
+
+	// 复杂条件删除多条
+	n, err = db.Table("user").Where("uid>? AND gid>?", 0, 0).Sort("uid", 1).Limit(2).Delete()
+	assert.Equal(t, err, nil)
+	assert.Equal(t, n, int64(4))
 }
