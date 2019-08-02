@@ -631,7 +631,7 @@ func (q *Query) One(arrIfc interface{}) (err error) {
 	tableStruct := q.getTableStruct(arrType)
 
 	// 判断是否开启了缓存
-	if q.tableEnableCache && tableStruct.EnableCache && len(q.where) == 0 && len(q.whereM) ==0 {
+	if q.tableEnableCache && tableStruct.EnableCache && len(q.primaryArgs) > 0 {
 		if len(q.primaryKeyStr) != 0 {
 			mp, ok := q.tableData[q.table]
 			if !ok {
