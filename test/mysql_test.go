@@ -1,0 +1,150 @@
+package test
+
+import (
+	"fmt"
+	"github.com/mydeeplike/dbx"
+	"gotest.tools/assert"
+	"os"
+	"testing"
+	"time"
+)
+
+var db *dbx.DB
+var err error
+
+type User struct {
+	Uid        int64     `db:"uid"`
+	Gid        int64     `db:"gid"`
+	Name       string    `db:"name"`
+	CreateDate time.Time `db:"createDate"`
+}
+
+func init() {
+
+	db, err = dbx.Open("mysql", "root@tcp(localhost)/test?parseTime=true&charset=utf8")
+	if err != nil {
+		panic(err)
+	}
+	//defer db.Close()
+
+	db.Stdout = os.Stdout
+	db.Stderr = os.Stdout
+
+	db.SetMaxIdleConns(10)
+	db.SetMaxOpenConns(10)
+	db.SetConnMaxLifetime(time.Second * 5)
+
+	_, err = db.Exec(`DROP TABLE IF EXISTS user;`)
+	_, err = db.Exec(`CREATE TABLE user(
+		uid        INT(11) PRIMARY KEY AUTO_INCREMENT,
+		gid        INT(11) NOT NULL DEFAULT '0',
+		name       TEXT             DEFAULT '',
+		createDate DATETIME         DEFAULT CURRENT_TIMESTAMP
+		);
+	`)
+	if err != nil {
+		panic(err)
+	}
+
+	// 开启缓存，可选项，一般只针对小表开启缓存，超过 10w 行，不建议开启！
+	db.BindStruct("user", &User{}, true)
+	db.EnableCache(true)
+
+}
+
+func TestOne(t *testing.T) {
+
+	var n int64
+
+	// 时间这里有坑，格式化以后的时间可能丢掉微秒
+	now := time.Now()
+
+	// 插入一条
+	u1 := &User{1, 1, "jet", now}
+	_, err = db.Table("user").Insert(u1)
+	assert.Equal(t, err, nil)
+
+	// 取出来，进行比较
+	u2 := &User{}
+	db.Table("user").WherePK(1).One(u2)
+	assert.Equal(t, *u1, *u2)
+
+	// 更新
+	u2.Gid = 2
+	u2.Name = "jet2"
+	u2.CreateDate = now.Add(1 * time.Second)
+	n, err := db.Table("user").WherePK(1).Update(u2)
+	assert.Equal(t, n, int64(1))
+	assert.Equal(t, err, nil)
+
+	// 取出来，进行比较
+	u3 := &User{}
+	db.Table("user").WherePK(1).One(u3)
+	assert.Equal(t, *u3, *u2)
+
+	// 其他条件的查询测试
+	err = db.Table("user").Where("uid=?", 1).One(u2)
+	assert.Equal(t, err, nil)
+	assert.Equal(t, u2.Uid, u3.Uid)
+
+	db.Table("user").WhereM(dbx.M{{"uid", 1}}).One(u3)
+	assert.Equal(t, *u3, *u2)
+
+	db.Table("user").WhereM(dbx.M{{"uid>", 0}}).One(u3)
+	assert.Equal(t, *u3, *u2)
+
+	db.Table("user").WhereM(dbx.M{{"gid>", 0}}).One(u3)
+	assert.Equal(t, *u3, *u2)
+
+	db.Table("user").WhereM(dbx.M{{"uid", 1}, {"gid", 1}}).One(u3)
+	assert.Equal(t, *u3, *u2)
+
+	// 删除
+	n, err = db.Table("user").WherePK(1).Delete()
+	assert.Equal(t, n, int64(1))
+	assert.Equal(t, err, nil)
+
+	// 再次查询
+	err = db.Table("user").WherePK(1).One(u3)
+	assert.Equal(t, err, dbx.ErrNoRows)
+}
+
+
+func TestMulti(t *testing.T) {
+
+	// 插入多条
+	var n int64
+	var err error
+
+	_, err = db.Exec(`TRUNCATE user;`)
+	assert.Equal(t, err, nil)
+
+	now := time.Now()
+	for i := int64(1); i < 5; i++ {
+		u := &User{
+			Uid: i,
+			Gid: i,
+			Name: fmt.Sprintf("name-%v", i),
+			CreateDate: now,
+		}
+		n, err = db.Table("user").Insert(u)
+		assert.Equal(t, err, nil)
+		assert.Equal(t, n, i)
+	}
+	for i := int64(1); i < 5; i++ {
+		u2 := &User{}
+		err = db.Table("user").WherePK(i).One(u2)
+		assert.Equal(t, err, nil)
+		assert.Equal(t, u2.Uid, i)
+		assert.Equal(t, u2.Gid, i)
+		assert.Equal(t, u2.Name, fmt.Sprintf("name-%v", i))
+		assert.Equal(t, u2.CreateDate, now)
+	}
+
+	// 复杂条件查询
+	u3 := &User{}
+	err = db.Table("user").Where("uid=?", 1).One(u3)
+	assert.Equal(t, err, nil)
+	assert.Equal(t, u3.Uid, int64(1))
+
+}
